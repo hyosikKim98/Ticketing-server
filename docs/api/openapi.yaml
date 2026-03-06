@@ -2,9 +2,427 @@ openapi: 3.0.3
 info:
   title: Ticketing Server API
   version: 0.0.1
-  description: |
-    TODO: Controller/DTO 기반 스펙 상세화 예정.
-    근거 파일:
-    - src/main/java/com/example/ticketing/api
-    - src/main/java/com/example/ticketing/api/dto
-paths: {}
+  description: REST API for queue-based ticketing and async payment requests.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Auth
+  - name: Events
+  - name: Queue
+  - name: Payments
+paths:
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Sign up
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and get access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/events:
+    get:
+      tags: [Events]
+      summary: List events
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/events/{eventId}:
+    get:
+      tags: [Events]
+      summary: Get event by id
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/queue/{eventId}/enter:
+    post:
+      tags: [Queue]
+      summary: Enter queue for an event
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueEnterResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/queue/{eventId}/me:
+    get:
+      tags: [Queue]
+      summary: Get my queue position and token state
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueMeResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/queue/{eventId}/issue:
+    post:
+      tags: [Queue]
+      summary: Issue entry tokens to top N users (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueQueueRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueQueueResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden (requires ADMIN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/payments/request:
+    post:
+      tags: [Payments]
+      summary: Publish payment request event
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequestCreateRequest'
+      responses:
+        '202':
+          description: Accepted (request published to Kafka)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequestCreateResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Invalid or expired entry token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Duplicate payment request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ApiErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    SignupRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AuthResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+    EventResponse:
+      type: object
+      required: [id, name, venue, startsAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        venue:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+    IssueQueueRequest:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
+          minimum: 1
+    IssuedTokenResponse:
+      type: object
+      required: [userId, entryToken]
+      properties:
+        userId:
+          type: integer
+          format: int64
+        entryToken:
+          type: string
+    IssueQueueResponse:
+      type: object
+      required: [eventId, issuedCount, issued]
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        issuedCount:
+          type: integer
+        issued:
+          type: array
+          items:
+            $ref: '#/components/schemas/IssuedTokenResponse'
+    QueueEnterResponse:
+      type: object
+      required: [eventId, userId, position]
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        position:
+          type: integer
+          format: int64
+    QueueMeResponse:
+      type: object
+      required: [eventId, userId, position, hasEntryToken]
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        position:
+          type: integer
+          format: int64
+        hasEntryToken:
+          type: boolean
+    PaymentRequestCreateRequest:
+      type: object
+      required: [eventId, entryToken, seatOption, amount]
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        entryToken:
+          type: string
+        seatOption:
+          type: string
+          maxLength: 50
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+        idempotencyKey:
+          type: string
+          nullable: true
+    PaymentRequestCreateResponse:
+      type: object
+      required: [idempotencyKey, status]
+      properties:
+        idempotencyKey:
+          type: string
+        status:
+          type: string

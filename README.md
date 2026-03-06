@@ -102,6 +102,7 @@ src/main/resources
 - 문서 포털: [docs/INDEX.md](docs/INDEX.md)
 - OpenAPI: [docs/api/openapi.yaml](docs/api/openapi.yaml)
 - OpenAPI 사용법: [docs/api/README.md](docs/api/README.md)
+- Testing & Verification: [docs/testing.md](docs/testing.md)
 - ERD: [docs/erd.md](docs/erd.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
