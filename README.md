@@ -43,7 +43,7 @@ docker compose up -d
 - Redis: `localhost:6379`
 - Kafka: `localhost:9092`
 
-근거: [docker-compose.yml](/Users/hyosik981010/Desktop/study/ticket/docker-compose.yml)
+근거: [docker-compose.yml](docker-compose.yml)
 
 ### 3) 애플리케이션 실행
 
@@ -52,8 +52,8 @@ docker compose up -d
 ```
 
 기본 설정 근거:
-- DB/Redis/Kafka 연결: [application.yml](/Users/hyosik981010/Desktop/study/ticket/src/main/resources/application.yml)
-- 빌드/의존성: [build.gradle](/Users/hyosik981010/Desktop/study/ticket/build.gradle)
+- DB/Redis/Kafka 연결: [application.yml](src/main/resources/application.yml)
+- 빌드/의존성: [build.gradle](build.gradle)
 
 ### 4) 테스트 실행
 
@@ -63,14 +63,11 @@ docker compose up -d
 
 ## 인증/인가 정책
 
-- `permitAll`
-- `/api/auth/**`
-- `GET /api/events/**`
-- `ROLE_ADMIN` 필요
-- `POST /api/queue/*/issue`
+- `permitAll`: `/api/auth/**`, `GET /api/events/**`
+- `ROLE_ADMIN` 필요: `POST /api/queue/*/issue`
 - 그 외 요청은 인증 필요
 
-근거: [SecurityConfig.java](/Users/hyosik981010/Desktop/study/ticket/src/main/java/com/example/ticketing/config/SecurityConfig.java)
+근거: [SecurityConfig.java](src/main/java/com/example/ticketing/config/SecurityConfig.java)
 
 ## 주요 API 흐름
 
@@ -80,10 +77,10 @@ docker compose up -d
 4. Kafka Consumer가 결제요청 저장/재고 차감 처리
 
 근거:
-- [QueueController.java](/Users/hyosik981010/Desktop/study/ticket/src/main/java/com/example/ticketing/api/queue/QueueController.java)
-- [PaymentController.java](/Users/hyosik981010/Desktop/study/ticket/src/main/java/com/example/ticketing/api/payment/PaymentController.java)
-- [PaymentRequestProducer.java](/Users/hyosik981010/Desktop/study/ticket/src/main/java/com/example/ticketing/infra/kafka/PaymentRequestProducer.java)
-- [PaymentRequestKafkaConsumer.java](/Users/hyosik981010/Desktop/study/ticket/src/main/java/com/example/ticketing/infra/kafka/PaymentRequestKafkaConsumer.java)
+- [QueueController.java](src/main/java/com/example/ticketing/api/queue/QueueController.java)
+- [PaymentController.java](src/main/java/com/example/ticketing/api/payment/PaymentController.java)
+- [PaymentRequestProducer.java](src/main/java/com/example/ticketing/infra/kafka/PaymentRequestProducer.java)
+- [PaymentRequestKafkaConsumer.java](src/main/java/com/example/ticketing/infra/kafka/PaymentRequestKafkaConsumer.java)
 
 ## 프로젝트 구조
 
@@ -102,9 +99,9 @@ src/main/resources
 
 ## 문서 링크
 
-- 문서 포털: [docs/INDEX.md](/Users/hyosik981010/Desktop/study/ticket/docs/INDEX.md)
-- OpenAPI: [docs/api/openapi.yaml](/Users/hyosik981010/Desktop/study/ticket/docs/api/openapi.yaml)
-- OpenAPI 사용법: [docs/api/README.md](/Users/hyosik981010/Desktop/study/ticket/docs/api/README.md)
-- ERD: [docs/erd.md](/Users/hyosik981010/Desktop/study/ticket/docs/erd.md)
-- Architecture: [docs/architecture.md](/Users/hyosik981010/Desktop/study/ticket/docs/architecture.md)
-- Troubleshooting: [docs/troubleshooting.md](/Users/hyosik981010/Desktop/study/ticket/docs/troubleshooting.md)
+- 문서 포털: [docs/INDEX.md](docs/INDEX.md)
+- OpenAPI: [docs/api/openapi.yaml](docs/api/openapi.yaml)
+- OpenAPI 사용법: [docs/api/README.md](docs/api/README.md)
+- ERD: [docs/erd.md](docs/erd.md)
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
