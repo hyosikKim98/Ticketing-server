@@ -1,16 +1,15 @@
 package com.example.ticketing.infra.kafka;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class PaymentRequestProducer {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentRequestProducer.class);
     private static final String TOPIC = "payment-requests";
 
     private final KafkaTemplate<String, PaymentRequestCreatedEvent> kafkaTemplate;

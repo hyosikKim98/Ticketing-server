@@ -2,17 +2,15 @@ package com.example.ticketing.infra.kafka;
 
 import com.example.ticketing.application.payment.PaymentRequestService;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class PaymentRequestKafkaConsumer {
-
-    private static final Logger log = LoggerFactory.getLogger(PaymentRequestKafkaConsumer.class);
 
     private final PaymentRequestService paymentRequestService;
 

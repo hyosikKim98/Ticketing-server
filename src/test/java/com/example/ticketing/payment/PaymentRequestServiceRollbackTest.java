@@ -1,23 +1,25 @@
 package com.example.ticketing.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.ticketing.TicketingApplication;
+import com.example.ticketing.application.payment.PaymentRequestService;
 import com.example.ticketing.domain.entity.Event;
 import com.example.ticketing.domain.entity.TicketInventory;
 import com.example.ticketing.domain.repository.EventRepository;
 import com.example.ticketing.domain.repository.PaymentRequestRepository;
 import com.example.ticketing.domain.repository.TicketInventoryRepository;
 import com.example.ticketing.infra.kafka.PaymentRequestCreatedEvent;
-import com.example.ticketing.infra.kafka.PaymentRequestKafkaConsumer;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -29,12 +31,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
     "spring.data.redis.host=localhost",
     "spring.data.redis.port=6379"
 })
-@Transactional
-class PaymentRequestKafkaConsumerIdempotencyTest {
+class PaymentRequestServiceRollbackTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-        .withDatabaseName("ticketing_test")
+        .withDatabaseName("ticketing_rollback_test")
         .withUsername("ticket")
         .withPassword("ticket");
 
@@ -49,7 +50,7 @@ class PaymentRequestKafkaConsumerIdempotencyTest {
     }
 
     @Autowired
-    private PaymentRequestKafkaConsumer consumer;
+    private PaymentRequestService paymentRequestService;
 
     @Autowired
     private EventRepository eventRepository;
@@ -61,23 +62,24 @@ class PaymentRequestKafkaConsumerIdempotencyTest {
     private PaymentRequestRepository paymentRequestRepository;
 
     @Test
-    void sameEventConsumedTwiceCreatesSingleRow() {
-        Event event = eventRepository.save(new Event("Concert", "Seoul", Instant.now().plusSeconds(3600)));
-        ticketInventoryRepository.save(new TicketInventory(event, 100, 100));
+    void rollbackInsertedPaymentRequestWhenSoldOut() {
+        Event event = eventRepository.save(new Event("Soldout", "Seoul", Instant.now().plusSeconds(3600)));
+        ticketInventoryRepository.save(new TicketInventory(event, 0, 0));
 
-        PaymentRequestCreatedEvent duplicate = new PaymentRequestCreatedEvent(
-            "idem-1",
-            1L,
+        String key = "idem-rollback-1";
+        PaymentRequestCreatedEvent request = new PaymentRequestCreatedEvent(
+            key,
+            99L,
             event.getId(),
             "VIP",
-            150000L
+            120000L
         );
 
-        consumer.listen(duplicate, null);
-        consumer.listen(duplicate, null);
+        assertThatThrownBy(() -> paymentRequestService.recordFromEvent(request))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
 
-        assertThat(paymentRequestRepository.count()).isEqualTo(1);
-        TicketInventory inventory = ticketInventoryRepository.findByEventIdForUpdate(event.getId()).orElseThrow();
-        assertThat(inventory.getAvailableQuantity()).isEqualTo(99);
+        assertThat(paymentRequestRepository.findByIdempotencyKey(key)).isEmpty();
     }
 }

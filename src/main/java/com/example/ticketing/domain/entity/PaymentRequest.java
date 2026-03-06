@@ -18,10 +18,10 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "payment_requests",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_payment_requests_idempotency", columnNames = "idempotencyKey")
+        @UniqueConstraint(name = "uk_payment_requests_idempotency", columnNames = "idempotency_key")
     },
     indexes = {
-        @Index(name = "idx_payment_requests_user_event_option", columnList = "userId,eventId,seatOption")
+        @Index(name = "idx_payment_requests_user_event_option", columnList = "user_id,event_id,seat_option")
     }
 )
 @Getter
@@ -32,13 +32,13 @@ public class PaymentRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(nullable = false)
+    @Column(name = "event_id", nullable = false)
     private Long eventId;
 
-    @Column(nullable = false, length = 50)
+    @Column(name = "seat_option", nullable = false, length = 50)
     private String seatOption;
 
     @Column(nullable = false)
@@ -48,10 +48,10 @@ public class PaymentRequest {
     @Column(nullable = false, length = 20)
     private PaymentStatus status;
 
-    @Column(nullable = false, unique = true, length = 120)
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 120)
     private String idempotencyKey;
 
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     public PaymentRequest(Long userId, Long eventId, String seatOption, Long amount, PaymentStatus status, String idempotencyKey) {

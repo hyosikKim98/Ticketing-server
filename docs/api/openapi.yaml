@@ -1,0 +1,10 @@
+openapi: 3.0.3
+info:
+  title: Ticketing Server API
+  version: 0.0.1
+  description: |
+    TODO: Controller/DTO 기반 스펙 상세화 예정.
+    근거 파일:
+    - src/main/java/com/example/ticketing/api
+    - src/main/java/com/example/ticketing/api/dto
+paths: {}
