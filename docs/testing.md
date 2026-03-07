@@ -49,7 +49,6 @@ docker compose up -d
 ```
 
 2. API 기본 흐름
-- `POST /api/auth/signup`
 - `POST /api/auth/login`
 - `POST /api/queue/{eventId}/enter`
 - `POST /api/queue/{eventId}/issue` (ADMIN)
@@ -64,23 +63,18 @@ docker compose up -d
 추가된 시나리오 파일:
 - `perf/jmeter/ticketing-flow.jmx`
 - `perf/jmeter/users.csv`
-- `perf/jmeter/admin.csv`
 
 시나리오 범위:
-- 사용자 가입/로그인
+- 시드 계정 로그인
 - 이벤트 목록 조회
 - 대기열 진입
 - 내 대기열 순번 조회
-- 선택적으로 관리자 토큰 발급 후 결제 요청 발행
 
 근거 API:
-- `POST /api/auth/signup`
 - `POST /api/auth/login`
 - `GET /api/events`
 - `POST /api/queue/{eventId}/enter`
 - `GET /api/queue/{eventId}/me`
-- `POST /api/queue/{eventId}/issue`
-- `POST /api/payments/request`
 
 ### 실행 전 준비
 
@@ -126,8 +120,8 @@ jmeter -n \
 ### 해석 포인트
 
 - `User Flow` 스레드 그룹은 현재 코드만으로 바로 실행 가능한 기본 부하 시나리오입니다.
-- `Admin Issue Token Flow`는 기본 비활성화 상태입니다. 시드된 관리자 계정으로 활성화해서 `issue` 응답의 `issued[*].token`을 확인해야 결제 요청까지 이어집니다.
-- `Optional Payment Request`는 `entryToken` 변수가 실제 토큰으로 설정된 경우에만 동작합니다.
+- 시나리오는 시드된 `loaduser01@example.com` ~ `loaduser20@example.com` 계정으로 로그인한 뒤 조회/대기열 API를 호출합니다.
+- 현재 JMX는 사용자 기본 흐름만 포함합니다. 관리자 토큰 발급과 결제 요청은 별도 수동 검증 대상으로 남겨둡니다.
 
 ## 검증 시 주의사항
 

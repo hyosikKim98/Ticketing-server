@@ -48,12 +48,13 @@ docker compose up -d
 ### 3) 애플리케이션 실행
 
 ```bash
-./gradlew bootRun
+./gradlew bootRun --args='--app.seed.enabled=true'
 ```
 
 기본 설정 근거:
 - DB/Redis/Kafka 연결: [application.yml](src/main/resources/application.yml)
 - 빌드/의존성: [build.gradle](build.gradle)
+- JMeter용 시드 데이터: [SeedDataInitializer.java](src/main/java/com/example/ticketing/config/SeedDataInitializer.java)
 
 ### 4) 테스트 실행
 
@@ -104,6 +105,7 @@ src/main/resources
 - OpenAPI 사용법: [docs/api/README.md](docs/api/README.md)
 - Testing & Verification: [docs/testing.md](docs/testing.md)
 - JMeter Scenario: [perf/jmeter/ticketing-flow.jmx](perf/jmeter/ticketing-flow.jmx)
+- JMeter Guide: [perf/jmeter/README.md](perf/jmeter/README.md)
 - ERD: [docs/erd.md](docs/erd.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
