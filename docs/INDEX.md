@@ -5,6 +5,7 @@
 - API Spec: [api/openapi.yaml](api/openapi.yaml)
 - API Guide: [api/README.md](api/README.md)
 - Testing & Verification: [testing.md](testing.md)
+- JMeter Scenario: [../perf/jmeter/ticketing-flow.jmx](../perf/jmeter/ticketing-flow.jmx)
 - ERD: [erd.md](erd.md)
 - Architecture: [architecture.md](architecture.md)
 - Troubleshooting: [troubleshooting.md](troubleshooting.md)

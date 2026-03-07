@@ -42,3 +42,5 @@ app:
   jwt:
     secret: change-me-to-at-least-32-bytes-secret-key-for-jjwt
     expiration-millis: 3600000
+  seed:
+    enabled: false
