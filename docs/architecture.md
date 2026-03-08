@@ -1,55 +1,48 @@
 # Architecture
 
-근거:
-- `src/main/java/com/example/ticketing/api`
-- `src/main/java/com/example/ticketing/application`
-- `src/main/java/com/example/ticketing/infra/kafka`
-- `src/main/java/com/example/ticketing/config`
-- `src/main/resources/application.yml`
-- `docker-compose.yml`
-
 ```mermaid
 flowchart LR
-  U["User Client"] -->|HTTPS/REST| API["Spring Boot API"]
-  A["Admin Client"] -->|HTTPS/REST| API
-
-  API --> SEC["JWT Filter/Security"]
-  SEC --> AUTH["AuthService"]
-  SEC --> EVT["EventService"]
-  SEC --> QUEUE["QueueService"]
-  SEC --> PAYAPP["PaymentApplicationService"]
-
-  AUTH -->|JPA| PG[(PostgreSQL)]
-  EVT -->|JPA| PG
-  PAYAPP -->|check/insert| PG
-  QUEUE -->|ZSET/KEY TTL| REDIS[(Redis)]
-
-  PAYAPP -->|produce payment-requests| KAFKA[(Kafka)]
-  KAFKA -->|consume payment-requests| CONSUMER["PaymentRequestKafkaConsumer"]
-  CONSUMER --> PAYREQ["PaymentRequestService"]
-  PAYREQ -->|insertIfAbsent + reserveOne| PG
+    U["User"] -->|"HTTPS/REST"| WEB["Static Web UI"]
+    A["Admin"] -->|"HTTPS/REST"| ADMIN["Admin UI"]
+    WEB -->|"JWT API"| API["Spring Boot API"]
+    ADMIN -->|"JWT API"| API
+    API -->|"JPA"| PG["PostgreSQL"]
+    API -->|"Redis ops"| REDIS["Redis"]
+    API -->|"produce"| KAFKA["Kafka topic: payment-requests"]
+    KAFKA -->|"consume"| CONSUMER["Payment Kafka Consumer"]
+    CONSUMER -->|"transaction"| PG
+    API -->|"metrics"| ACT["Actuator / Prometheus"]
+    ACT -->|"scrape"| PROM["Prometheus"]
+    PROM -->|"query"| GRAF["Grafana"]
 ```
 
 ## 핵심 요청 흐름
 
-1. 사용자가 `/api/auth/login`으로 JWT를 발급받습니다.
-2. 사용자는 `/api/queue/{eventId}/enter`로 대기열에 진입합니다.
-3. 관리자는 `/api/queue/{eventId}/issue`로 상위 N명에게 입장 토큰을 발급합니다.
-4. 사용자는 발급된 토큰으로 `/api/payments/request`를 호출합니다.
-5. API는 토큰/중복 여부를 검증한 뒤 Kafka `payment-requests` 토픽으로 이벤트를 발행하고 `202`를 즉시 반환합니다.
-6. Kafka Consumer가 이벤트를 읽어 `payment_requests`를 저장하고 재고를 차감합니다.
-7. 소비 중 실패하면 재시도 후 DLT(`payment-requests.DLT`)로 전송됩니다.
+1. 사용자는 로그인으로 JWT를 발급받습니다.
+2. 사용자는 이벤트를 조회하고 `POST /api/queue/{eventId}/enter`로 대기열에 진입합니다.
+3. `QueueService`는 Redis ZSET 대기열과 `active_slots:{eventId}`를 기준으로 빈 슬롯을 확인합니다.
+4. 빈 슬롯이 있으면 기본 프로파일에서는 10분, `test` 프로파일에서는 2분짜리 입장 토큰을 발급하고 사용자를 활성 슬롯에 등록합니다.
+5. 사용자는 `POST /api/payments/request`로 결제 요청을 발행합니다.
+6. API 서버는 요청을 바로 완료하지 않고 Kafka `payment-requests` 토픽으로 이벤트를 발행합니다.
+7. `PaymentRequestKafkaConsumer`가 이벤트를 소비해 `payment_requests`를 저장하고 `ticket_inventory.available_quantity`를 감소시킵니다.
+8. DB 커밋 후 슬롯을 반환하고 다음 대기자를 자동 진입시킵니다.
 
 ## 설계 포인트
 
-- 인증/인가: JWT stateless + 엔드포인트별 권한 분리(`ADMIN` 전용 발급 API).
-- 대기열 일관성: Redis Lua 스크립트로 토큰 발급과 큐 제거를 원자적으로 처리.
-- 중복 방지: Redis 결제 가드 + DB idempotency unique key + `ON CONFLICT DO NOTHING`.
-- 재고 동시성: 비관적 락(`PESSIMISTIC_WRITE`)으로 재고 감소 경합 제어.
-- 비동기 내구성: Kafka 수동 ack + 재시도 + DLT 구성.
+- 대기열과 활성 슬롯은 Redis에서 관리해 빠른 입장 제어를 수행합니다.
+- 결제 요청 저장과 재고 차감은 Kafka consumer의 트랜잭션 안에서 처리합니다.
+- `afterCommit` 후 슬롯을 반환해 DB 롤백과 Redis 상태 불일치를 줄입니다.
+- 관리자 수동 발급 API를 유지하되, 자동 발급과 동일한 Redis 원자 로직을 사용합니다.
+- 테스트 프로파일에서는 토큰 TTL을 2분으로 줄여 JMeter mixed-flow 검증을 빠르게 수행합니다.
 
 ## 운영 포인트
 
-- 로깅 키: `idempotencyKey`, `eventId`, `userId`를 produce/consume 로그에 기록.
-- 장애 분석: DLT 토픽(`payment-requests.DLT`)을 주기적으로 모니터링.
-- 지표 수집: 큐 길이(`queue:{eventId}` ZSET), 토큰 발급 수, 결제 요청 적재 성공률을 추적.
+- `/actuator/prometheus`로 Micrometer 메트릭을 노출합니다.
+- Grafana 대시보드에서 활성 슬롯, 대기 사용자, 발급/반환/만료율을 관찰합니다.
+- JMeter 200-user mixed-flow 시나리오는 `test` 프로파일의 2분 TTL을 기준으로 결제 성공과 토큰 만료를 함께 재현합니다.
+
+근거:
+- `src/main/java/com/example/ticketing/application/queue/QueueService.java`
+- `src/main/java/com/example/ticketing/application/payment/PaymentRequestService.java`
+- `src/main/java/com/example/ticketing/infra/kafka/PaymentRequestKafkaConsumer.java`
+- `monitoring/grafana/dashboards/ticketing-overview.json`

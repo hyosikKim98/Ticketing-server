@@ -2,54 +2,62 @@
 
 ## Base URL
 
-- `http://localhost:8080`
-- 근거: `src/main/resources/application.yml`에 `server.port` 오버라이드가 없음
+- Local: `http://localhost:8080`
 
 ## Auth
 
-- 방식: `Authorization: Bearer <accessToken>`
-- 토큰 발급: `POST /api/auth/login`
-- 권한 규칙:
-- 누구나 호출 가능: `/api/auth/**`, `GET /api/events/**`
-- ADMIN 필요: `POST /api/queue/{eventId}/issue`
-- 그 외 인증 필요
+- Login response returns `accessToken`
+- Protected APIs require `Authorization: Bearer {accessToken}`
+- `POST /api/queue/{eventId}/issue` requires `ROLE_ADMIN`
+- `GET /api/queue/{eventId}/token` is enabled only in the `test` profile
 
 근거:
+- `src/main/java/com/example/ticketing/api/auth/AuthController.java`
 - `src/main/java/com/example/ticketing/config/SecurityConfig.java`
-- `src/main/java/com/example/ticketing/security/JwtAuthenticationFilter.java`
+- `src/main/resources/application-test.yml`
 
-## 대표 curl 예시 3개
+## Example cURL
 
-### 1) 로그인
+### 1. Login
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
+  -H 'Content-Type: application/json' \
   -d '{
-    "email": "loaduser01@example.com",
+    "email": "loaduser001@example.com",
     "password": "password123"
   }'
 ```
 
-### 2) 이벤트 목록 조회(인증 불필요)
+### 2. Enter queue and check status
 
 ```bash
-curl http://localhost:8080/api/events
+curl -X POST http://localhost:8080/api/queue/1/enter \
+  -H "Authorization: Bearer ${TOKEN}"
+
+curl http://localhost:8080/api/queue/1/me \
+  -H "Authorization: Bearer ${TOKEN}"
 ```
 
-### 3) 결제 요청 발행(인증 필요)
+### 3. Get entry token (`test` profile)
+
+```bash
+curl http://localhost:8080/api/queue/1/token \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+기본 프로파일에는 현재 사용자의 `entryToken` 문자열을 조회하는 공개 API가 없습니다. 부하 테스트와 API 재현은 `test` 프로파일의 토큰 조회 API를 기준으로 작성했습니다.
+
+### 4. Request payment
 
 ```bash
 curl -X POST http://localhost:8080/api/payments/request \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <accessToken>" \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${TOKEN}" \
   -d '{
     "eventId": 1,
-    "entryToken": "1:1700000000:123456:1",
-    "seatOption": "VIP",
-    "amount": 150000,
-    "idempotencyKey": "pay-req-001"
+    "entryToken": "'"${ENTRY_TOKEN}"'",
+    "seatOption": "STANDARD",
+    "amount": 110000
   }'
 ```
-
-자세한 스키마/응답 코드는 [openapi.yaml](openapi.yaml) 참고.

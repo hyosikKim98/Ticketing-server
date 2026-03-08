@@ -1,111 +1,198 @@
 # Ticketing Server
 
-실시간 대기열과 비동기 결제 요청 처리를 결합해 티켓 예매 트래픽 피크를 안정적으로 처리하는 Spring Boot 백엔드입니다.
+Redis 대기열, Kafka 비동기 결제, 20-slot 입장 제어를 결합해 이벤트 티켓 트래픽 피크를 안정적으로 처리하는 Spring Boot 서버입니다.
 
 ## 핵심 가치
 
-- 대기열 기반 입장 제어로 순간 트래픽 급증 시 API 과부하를 완화합니다.
-- 결제 요청을 Kafka 비동기 처리로 분리해 응답 지연을 줄이고 처리 내구성을 높입니다.
-- JWT 인증/권한 제어로 사용자/관리자 동작 경계를 명확히 유지합니다.
+- 대기열과 활성 슬롯 제한으로 동시 결제 인원을 제어합니다.
+- Kafka 비동기 처리로 결제 요청과 재고 차감을 분리합니다.
+- JWT 인증과 관리자 발급 기능으로 사용자/운영자 권한 경계를 유지합니다.
+- Prometheus, Grafana, JMeter 기반으로 부하 테스트와 관측을 함께 검증할 수 있습니다.
 
 ## 핵심 기능
 
-- 회원가입/로그인(JWT 발급)
-- 이벤트 목록/단건 조회
-- Redis ZSET 기반 대기열 진입/순번 조회
-- 관리자 대기열 상위 N명 입장 토큰 발급
-- Kafka 기반 결제 요청 비동기 발행/소비 + 중복 방지(idempotency)
+- 회원가입, 로그인, JWT 인증
+- 이벤트 조회와 Redis ZSET 기반 대기열 진입
+- 최대 20명 활성 슬롯 기반 입장 토큰 발급
+- Kafka 기반 결제 요청 발행 및 소비
+- Prometheus, Grafana, JMeter 기반 관측과 부하 테스트
 
 ## 기술 스택
 
 - 서버: Java 21, Spring Boot, Spring Web, Spring Security, Spring Validation
 - 데이터: PostgreSQL, Spring Data JPA, Flyway
-- 캐시/큐: Redis, Apache Kafka
-- 인증: JWT(`jjwt`)
-- 빌드/테스트: Gradle, JUnit 5, Testcontainers, Mockito
-- 인프라(로컬): Docker Compose(PostgreSQL/Redis/Kafka)
+- 캐시/대기열: Redis
+- 메시징: Apache Kafka
+- 인증: JWT (`jjwt`)
+- 관측: Spring Boot Actuator, Micrometer, Prometheus, Grafana
+- 테스트/부하: JUnit 5, Mockito, Testcontainers, JMeter
+- 인프라(로컬): Docker Compose
 
 ## 빠른 시작
 
-### 1) 사전 준비
+### 1. 사전 준비
 
 - Java 21
 - Docker / Docker Compose
+- JMeter CLI
+- 기본 포트
+  - App: `8080`
+  - PostgreSQL: `5432`
+  - Redis: `6379`
+  - Kafka: `9092`
+  - Prometheus: `9090`
+  - Grafana: `3000`
 
-### 2) 의존 인프라 실행
+### 2. 로컬 인프라 실행
 
 ```bash
+docker compose down -v
 docker compose up -d
 ```
 
-실행 대상:
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
-- Kafka: `localhost:9092`
+근거:
+- [docker-compose.yml](docker-compose.yml)
+- [monitoring/prometheus.yml](monitoring/prometheus.yml)
 
-근거: [docker-compose.yml](docker-compose.yml)
+### 3. 애플리케이션 실행
 
-### 3) 애플리케이션 실행
+기본 실행:
 
 ```bash
 ./gradlew bootRun --args='--app.seed.enabled=true'
 ```
 
-기본 설정 근거:
-- DB/Redis/Kafka 연결: [application.yml](src/main/resources/application.yml)
-- 빌드/의존성: [build.gradle](build.gradle)
-- JMeter용 시드 데이터: [SeedDataInitializer.java](src/main/java/com/example/ticketing/config/SeedDataInitializer.java)
-
-### 4) 테스트 실행
+JMeter mixed-flow 테스트 실행:
 
 ```bash
-./gradlew test
+./gradlew bootRun --args='--spring.profiles.active=test --app.seed.enabled=true'
 ```
 
-## 인증/인가 정책
-
-- `permitAll`: `/api/auth/**`, `GET /api/events/**`
-- `ROLE_ADMIN` 필요: `POST /api/queue/*/issue`
-- 그 외 요청은 인증 필요
-
-근거: [SecurityConfig.java](src/main/java/com/example/ticketing/config/SecurityConfig.java)
-
-## 주요 API 흐름
-
-1. 사용자 대기열 진입: `POST /api/queue/{eventId}/enter`
-2. 관리자 토큰 발급: `POST /api/queue/{eventId}/issue`
-3. 사용자 결제 요청 발행: `POST /api/payments/request` (`202 Accepted`)
-4. Kafka Consumer가 결제요청 저장/재고 차감 처리
+`test` 프로파일 차이:
+- 입장 토큰 TTL: 2분
+- 결제 중복 방지 TTL: 2분
+- 테스트용 토큰 조회 API 활성화: `GET /api/queue/{eventId}/token`
 
 근거:
-- [QueueController.java](src/main/java/com/example/ticketing/api/queue/QueueController.java)
-- [PaymentController.java](src/main/java/com/example/ticketing/api/payment/PaymentController.java)
-- [PaymentRequestProducer.java](src/main/java/com/example/ticketing/infra/kafka/PaymentRequestProducer.java)
-- [PaymentRequestKafkaConsumer.java](src/main/java/com/example/ticketing/infra/kafka/PaymentRequestKafkaConsumer.java)
+- [src/main/resources/application.yml](src/main/resources/application.yml)
+- [src/main/resources/application-test.yml](src/main/resources/application-test.yml)
+- [src/main/java/com/example/ticketing/api/queue/QueueController.java](src/main/java/com/example/ticketing/api/queue/QueueController.java)
+
+### 4. 관측 확인
+
+- Prometheus: [http://localhost:9090](http://localhost:9090)
+- Grafana: [http://localhost:3000](http://localhost:3000)
+  - 기본 계정: `admin / admin`
+
+노출 메트릭 예시:
+- `ticketing_queue_active_slots`
+- `ticketing_queue_waiting_users`
+- `ticketing_queue_enter_total`
+- `ticketing_queue_issue_auto_total`
+- `ticketing_queue_slot_release_total`
+- `ticketing_queue_slot_expire_total`
+- `ticketing_payment_publish_total`
+
+근거:
+- [src/main/java/com/example/ticketing/application/queue/QueueMetrics.java](src/main/java/com/example/ticketing/application/queue/QueueMetrics.java)
+- [monitoring/grafana/dashboards/ticketing-overview.json](monitoring/grafana/dashboards/ticketing-overview.json)
+
+### 5. JMeter 부하 테스트
+
+200명 mixed-flow 시나리오:
+
+```bash
+jmeter -n \
+  -t perf/jmeter/queue-slot-mixed-flow.jmx \
+  -l perf/jmeter/queue-slot-mixed-flow.jtl \
+  -e \
+  -o perf/jmeter/report-queue-slot-mixed
+```
+
+시나리오 요약:
+- 200 users 로그인
+- 같은 이벤트에 대기열 진입
+- 입장 토큰 획득까지 polling
+- 70%는 결제 요청
+- 30%는 결제하지 않고 토큰 만료
+- 활성 슬롯 20개 유지 여부와 자동 보충 관찰
+
+근거:
+- [perf/jmeter/queue-slot-mixed-flow.jmx](perf/jmeter/queue-slot-mixed-flow.jmx)
+- [perf/jmeter/users.csv](perf/jmeter/users.csv)
+
+## 인증/인가
+
+- `permitAll`
+  - `/api/auth/**`
+  - `GET /api/events/**`
+  - `/actuator/health`
+  - `/actuator/info`
+  - `/actuator/prometheus`
+- `ROLE_ADMIN`
+  - `POST /api/queue/{eventId}/issue`
+  - 기타 `/actuator/**`
+- 그 외 `/api/**`는 인증 필요
+
+근거:
+- [src/main/java/com/example/ticketing/config/SecurityConfig.java](src/main/java/com/example/ticketing/config/SecurityConfig.java)
+
+## 주요 흐름
+
+### 사용자 구매 흐름
+
+1. 로그인 후 JWT 획득
+2. `POST /api/queue/{eventId}/enter`
+3. 서버가 빈 슬롯이 있으면 입장 토큰 자동 발급
+4. 사용자는 `POST /api/payments/request`
+5. Kafka consumer가 결제 요청 저장 후 재고 차감
+6. 결제 성공 시 슬롯 반환
+7. 다음 대기자 자동 입장
+
+### 운영자 흐름
+
+1. 관리자 로그인
+2. `POST /api/queue/{eventId}/issue`
+3. 상위 N명에게 수동으로 입장 토큰 발급
 
 ## 프로젝트 구조
 
 ```text
 src/main/java/com/example/ticketing
-├── api            # REST Controller + DTO
-├── application    # 유스케이스/서비스
-├── domain         # 엔티티/리포지토리
-├── infra          # Kafka Producer/Consumer
-├── security       # JWT 필터/토큰/Principal
-└── config         # Security/Kafka 설정
+├── api            # Controller + DTO
+├── application    # queue / payment / inventory / auth 서비스
+├── domain         # Entity + Repository
+├── infra          # Kafka producer / consumer
+├── security       # JWT filter / principal / token provider
+└── config         # Security / Kafka / Seed / Properties
 
 src/main/resources
-└── db/migration   # Flyway 마이그레이션
+├── application.yml
+├── application-test.yml
+└── db/migration
+
+monitoring
+├── prometheus.yml
+└── grafana
+
+perf/jmeter
+├── ticketing-flow.jmx
+├── queue-slot-mixed-flow.jmx
+├── users.csv
+└── README.md
 ```
 
 ## 문서 링크
 
 - 문서 포털: [docs/INDEX.md](docs/INDEX.md)
 - OpenAPI: [docs/api/openapi.yaml](docs/api/openapi.yaml)
-- OpenAPI 사용법: [docs/api/README.md](docs/api/README.md)
-- Testing & Verification: [docs/testing.md](docs/testing.md)
-- JMeter Scenario: [perf/jmeter/ticketing-flow.jmx](perf/jmeter/ticketing-flow.jmx)
-- JMeter Guide: [perf/jmeter/README.md](perf/jmeter/README.md)
+- API 가이드: [docs/api/README.md](docs/api/README.md)
 - ERD: [docs/erd.md](docs/erd.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
+
+## 참고
+
+- 테스트용 토큰 조회 API는 `test` 프로파일에서만 활성화됩니다.
+- Redis는 볼륨이 없어 `docker compose down` 시 대기열 데이터가 초기화됩니다.
+- PostgreSQL, Kafka, Grafana는 named volume을 사용하므로 `docker compose down -v`를 실행할 때 함께 초기화됩니다.
