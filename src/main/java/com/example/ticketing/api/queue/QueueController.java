@@ -4,6 +4,7 @@ import com.example.ticketing.api.dto.IssueQueueRequest;
 import com.example.ticketing.api.dto.IssueQueueResponse;
 import com.example.ticketing.api.dto.QueueEnterResponse;
 import com.example.ticketing.api.dto.QueueMeResponse;
+import com.example.ticketing.api.dto.QueueTokenResponse;
 import com.example.ticketing.application.queue.QueueService;
 import com.example.ticketing.security.CustomPrincipal;
 import jakarta.validation.Valid;
@@ -31,6 +32,11 @@ public class QueueController {
     @GetMapping("/{eventId}/me")
     public QueueMeResponse me(@PathVariable Long eventId,  @AuthenticationPrincipal CustomPrincipal principal) {
         return queueService.position(eventId, principal.userId());
+    }
+
+    @GetMapping("/{eventId}/token")
+    public QueueTokenResponse token(@PathVariable Long eventId, @AuthenticationPrincipal CustomPrincipal principal) {
+        return queueService.currentToken(eventId, principal.userId());
     }
 
     @PostMapping("/{eventId}/issue")

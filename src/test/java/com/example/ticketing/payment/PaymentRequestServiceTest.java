@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.example.ticketing.application.inventory.TicketInventoryService;
 import com.example.ticketing.application.payment.PaymentRequestService;
+import com.example.ticketing.application.queue.QueueMetrics;
+import com.example.ticketing.application.queue.QueueService;
 import com.example.ticketing.domain.repository.PaymentRequestRepository;
 import com.example.ticketing.infra.kafka.PaymentRequestCreatedEvent;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,12 @@ class PaymentRequestServiceTest {
     @Mock
     private TicketInventoryService ticketInventoryService;
 
+    @Mock
+    private QueueService queueService;
+
+    @Mock
+    private QueueMetrics queueMetrics;
+
     @InjectMocks
     private PaymentRequestService paymentRequestService;
 
@@ -40,6 +48,7 @@ class PaymentRequestServiceTest {
         verify(paymentRequestRepository, times(1))
             .insertIfAbsent(1L, 10L, "VIP", 1000L, "REQUESTED", "idem-dup");
         verify(ticketInventoryService, never()).reserveOne(anyLong());
+        verify(queueService, never()).releaseSlot(anyLong(), anyLong(), anyString());
     }
 
     @Test
@@ -51,5 +60,6 @@ class PaymentRequestServiceTest {
         paymentRequestService.recordFromEvent(event);
 
         verify(ticketInventoryService, times(1)).reserveOne(20L);
+        verify(queueService, times(1)).releaseSlot(20L, 2L, "PAYMENT_RECORDED");
     }
 }

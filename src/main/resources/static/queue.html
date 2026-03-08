@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>대기열 대기 | Ticketing Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">TK</div>
+        <div class="brand-copy">
+          <h1>Queue Ticketing</h1>
+          <p id="queueUser">로그인 정보 확인 중</p>
+        </div>
+      </div>
+      <div class="nav">
+        <a href="/login.html">로그인</a>
+        <a href="/event.html">이벤트 구매</a>
+        <a class="active" href="/queue.html">대기열 대기</a>
+        <a href="/admin.html">관리자 발급</a>
+        <button id="logoutButton" type="button">로그아웃</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <section class="card pad queue-big">
+        <div>
+          <p class="eyebrow">Queue Position</p>
+          <h2>현재 대기 순번</h2>
+          <div id="queueNumber" class="queue-number">-</div>
+          <div id="queueState" class="pill"><span class="dot"></span> 조회 전</div>
+          <p class="hint">
+            JMeter가 같은 이벤트에 먼저 들어가 있으면, 새 계정은 그 뒤 순번으로 배치됩니다.
+            같은 계정으로 중복 진입하면 순번은 늘어나지 않습니다.
+          </p>
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="card pad">
+          <p class="eyebrow">Polling</p>
+          <h3 class="panel-title">대기열 상태 조회</h3>
+          <p class="panel-copy">`GET /api/queue/{eventId}/me`를 3초마다 호출합니다.</p>
+          <div id="queueDetails" class="message">조회 전입니다.</div>
+          <div class="button-row">
+            <button class="btn primary" id="refreshButton" type="button">지금 갱신</button>
+            <a class="btn secondary" href="/event.html">이벤트로 돌아가기</a>
+          </div>
+        </section>
+
+        <section class="card pad">
+          <p class="eyebrow">Info</p>
+          <h3 class="panel-title">관찰 포인트</h3>
+          <div class="mini-list">
+            <div>이벤트 ID: <strong id="eventIdLabel">1</strong></div>
+            <div>입장 토큰 보유 여부: <strong id="tokenLabel">false</strong></div>
+            <div>최근 갱신 시각: <strong id="updatedAtLabel">-</strong></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    if (!requireLogin()) {
+      throw new Error("redirecting");
+    }
+
+    bindLogout();
+    document.getElementById("queueUser").textContent = `${getEmail()} 로 로그인됨`;
+
+    const queueNumber = document.getElementById("queueNumber");
+    const queueState = document.getElementById("queueState");
+    const queueDetails = document.getElementById("queueDetails");
+    const tokenLabel = document.getElementById("tokenLabel");
+    const updatedAtLabel = document.getElementById("updatedAtLabel");
+    const eventIdLabel = document.getElementById("eventIdLabel");
+    const refreshButton = document.getElementById("refreshButton");
+
+    async function refreshQueue() {
+      const eventId = getSelectedEventId();
+      eventIdLabel.textContent = eventId;
+
+      try {
+        const data = await api(`/api/queue/${eventId}/me`, { method: "GET" });
+        queueNumber.textContent = data.position;
+        queueState.innerHTML = `<span class="dot ${data.hasEntryToken ? "live" : ""}"></span>${data.hasEntryToken ? "입장 토큰 보유" : "대기 중"}`;
+        setMessage(
+          queueDetails,
+          `이벤트 ID: ${data.eventId}\n사용자 ID: ${data.userId}\n순번: ${data.position}\n입장 토큰 보유: ${data.hasEntryToken}`,
+          data.hasEntryToken ? "success" : ""
+        );
+        tokenLabel.textContent = String(data.hasEntryToken);
+        updatedAtLabel.textContent = new Date().toLocaleTimeString("ko-KR");
+      } catch (error) {
+        setMessage(queueDetails, error.message, "error");
+        queueState.innerHTML = `<span class="dot"></span>조회 실패`;
+      }
+    }
+
+    refreshButton.addEventListener("click", refreshQueue);
+    refreshQueue();
+    setInterval(refreshQueue, 3000);
+  </script>
+</body>
+</html>

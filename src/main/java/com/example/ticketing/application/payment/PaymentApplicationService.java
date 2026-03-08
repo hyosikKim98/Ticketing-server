@@ -2,6 +2,7 @@ package com.example.ticketing.application.payment;
 
 import com.example.ticketing.api.dto.PaymentRequestCreateRequest;
 import com.example.ticketing.api.dto.PaymentRequestCreateResponse;
+import com.example.ticketing.application.queue.QueueMetrics;
 import com.example.ticketing.application.queue.QueueService;
 import com.example.ticketing.domain.repository.PaymentRequestRepository;
 import com.example.ticketing.infra.kafka.PaymentRequestCreatedEvent;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class PaymentApplicationService {
 
     private final QueueService queueService;
+    private final QueueMetrics queueMetrics;
     private final PaymentRequestProducer producer;
     private final PaymentRequestRepository paymentRequestRepository;
 
@@ -48,6 +50,7 @@ public class PaymentApplicationService {
                 request.amount()
             )
         );
+        queueMetrics.recordPaymentPublish();
 
         return new PaymentRequestCreateResponse(idempotencyKey, "PUBLISHED");
     }

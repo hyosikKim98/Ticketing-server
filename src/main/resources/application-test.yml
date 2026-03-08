@@ -1,0 +1,6 @@
+app:
+  queue:
+    entry-token-ttl: 2m
+    payment-guard-ttl: 2m
+    max-active-slots: 20
+    test-token-endpoint-enabled: true

@@ -38,9 +38,27 @@ logging:
   level:
     com.example.ticketing: INFO
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 app:
   jwt:
     secret: change-me-to-at-least-32-bytes-secret-key-for-jjwt
     expiration-millis: 3600000
+  queue:
+    entry-token-ttl: 10m
+    payment-guard-ttl: 10m
+    max-active-slots: 20
+    test-token-endpoint-enabled: false
   seed:
     enabled: false

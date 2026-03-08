@@ -36,9 +36,9 @@ public class SeedDataInitializer implements CommandLineRunner {
     private void seedUsers() {
         createUserIfAbsent("admin@example.com", "password123", UserRole.ADMIN);
 
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= 200; i++) {
             createUserIfAbsent(
-                "loaduser%02d@example.com".formatted(i),
+                "loaduser%03d@example.com".formatted(i),
                 "password123",
                 UserRole.USER
             );

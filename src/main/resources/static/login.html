@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 | Ticketing Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">TK</div>
+        <div class="brand-copy">
+          <h1>Queue Ticketing</h1>
+          <p>실시간 대기열 예매 데모</p>
+        </div>
+      </div>
+      <div class="nav">
+        <a class="active" href="/login.html">로그인</a>
+        <a href="/event.html">이벤트 구매</a>
+        <a href="/queue.html">대기열 대기</a>
+        <a href="/admin.html">관리자 발급</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <section class="card pad">
+        <p class="eyebrow">Access</p>
+        <h2 class="headline">로그인 후<br>예매 대기열에 진입</h2>
+        <p class="subcopy">
+          현재 서버 API에 맞춘 최소 화면입니다. JWT 로그인 후 이벤트 페이지에서 대기열에 진입하고,
+          대기 페이지에서 본인 순번과 입장 토큰 보유 여부를 확인할 수 있습니다.
+        </p>
+        <div class="stats">
+          <div class="stat">
+            <strong>20</strong>
+            <span class="label">시드 사용자 계정</span>
+          </div>
+          <div class="stat">
+            <strong>1</strong>
+            <span class="label">시드 이벤트</span>
+          </div>
+          <div class="stat">
+            <strong>JWT</strong>
+            <span class="label">인증 방식</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card pad">
+        <p class="eyebrow">Seed Account</p>
+        <h3 class="panel-title">빠른 접속</h3>
+        <p class="panel-copy">
+          시드 실행 기준 테스트 계정입니다. JMeter와 같은 계정을 쓰면 이미 대기열에 들어가 있을 수 있습니다.
+        </p>
+        <div class="mini-list">
+          <div><strong>User</strong><br>loaduser01@example.com / password123</div>
+          <div><strong>Admin</strong><br>admin@example.com / password123</div>
+          <div><strong>다음 화면</strong><br>이벤트 선택 후 대기열 진입</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="layout">
+      <section class="card pad">
+        <p class="eyebrow">Login</p>
+        <h3 class="panel-title">API 로그인</h3>
+        <p class="panel-copy">`POST /api/auth/login`에 맞춰 이메일과 비밀번호를 전송합니다.</p>
+        <form id="loginForm">
+          <div class="field">
+            <label for="email">이메일</label>
+            <input id="email" name="email" type="email" value="loaduser01@example.com" required>
+          </div>
+          <div class="field">
+            <label for="password">비밀번호</label>
+            <input id="password" name="password" type="password" value="password123" required>
+          </div>
+          <div class="button-row">
+            <button class="btn primary" type="submit">로그인</button>
+            <button class="btn secondary" type="button" id="seedUserButton">시드 사용자 채우기</button>
+            <button class="btn secondary" type="button" id="seedAdminButton">관리자 채우기</button>
+          </div>
+        </form>
+        <div id="loginMessage" class="message">아직 로그인하지 않았습니다.</div>
+      </section>
+
+      <section class="card pad">
+        <p class="eyebrow">Flow</p>
+        <h3 class="panel-title">현재 화면에서 가능한 동작</h3>
+        <div class="mini-list">
+          <div>1. 로그인 후 access token을 브라우저 localStorage에 저장</div>
+          <div>2. 이벤트 구매 페이지에서 이벤트 조회</div>
+          <div>3. 대기열 진입 후 대기 페이지에서 순번 조회</div>
+          <div>4. 입장 토큰 발급은 관리자 `issue` API가 별도로 필요</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    const form = document.getElementById("loginForm");
+    const message = document.getElementById("loginMessage");
+    const seedUserButton = document.getElementById("seedUserButton");
+    const seedAdminButton = document.getElementById("seedAdminButton");
+
+    if (getEmail()) {
+      document.getElementById("email").value = getEmail();
+    }
+
+    seedUserButton.addEventListener("click", () => {
+      document.getElementById("email").value = "loaduser01@example.com";
+      document.getElementById("password").value = "password123";
+    });
+
+    seedAdminButton.addEventListener("click", () => {
+      document.getElementById("email").value = "admin@example.com";
+      document.getElementById("password").value = "password123";
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        setMessage(message, "로그인 요청 중...");
+        const data = await api("/api/auth/login", {
+          method: "POST",
+          auth: false,
+          body: JSON.stringify({ email, password }),
+        });
+
+        setToken(data.accessToken);
+        setEmail(email);
+        setMessage(message, "로그인 성공. 이벤트 구매 페이지로 이동합니다.", "success");
+        setTimeout(() => {
+          location.href = "/event.html";
+        }, 500);
+      } catch (error) {
+        setMessage(message, error.message, "error");
+      }
+    });
+  </script>
+</body>
+</html>
