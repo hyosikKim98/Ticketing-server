@@ -2,10 +2,7 @@
 
 ```mermaid
 flowchart LR
-    U["User"] -->|"HTTPS/REST"| WEB["Static Web UI"]
-    A["Admin"] -->|"HTTPS/REST"| ADMIN["Admin UI"]
-    WEB -->|"JWT API"| API["Spring Boot API"]
-    ADMIN -->|"JWT API"| API
+    C["User / Admin Client"] -->|"HTTPS/REST + JWT"| API["Spring Boot API"]
     API -->|"JPA"| PG["PostgreSQL"]
     API -->|"Redis ops"| REDIS["Redis"]
     API -->|"produce"| KAFKA["Kafka topic: payment-requests"]
@@ -18,11 +15,11 @@ flowchart LR
 
 ## 핵심 요청 흐름
 
-1. 사용자는 로그인으로 JWT를 발급받습니다.
-2. 사용자는 이벤트를 조회하고 `POST /api/queue/{eventId}/enter`로 대기열에 진입합니다.
+1. 사용자 또는 관리자는 로그인으로 JWT를 발급받습니다.
+2. 클라이언트는 이벤트를 조회하고 `POST /api/queue/{eventId}/enter`로 대기열에 진입합니다.
 3. `QueueService`는 Redis ZSET 대기열과 `active_slots:{eventId}`를 기준으로 빈 슬롯을 확인합니다.
 4. 빈 슬롯이 있으면 기본 프로파일에서는 10분, `test` 프로파일에서는 2분짜리 입장 토큰을 발급하고 사용자를 활성 슬롯에 등록합니다.
-5. 사용자는 `POST /api/payments/request`로 결제 요청을 발행합니다.
+5. 클라이언트는 `POST /api/payments/request`로 결제 요청을 발행합니다.
 6. API 서버는 요청을 바로 완료하지 않고 Kafka `payment-requests` 토픽으로 이벤트를 발행합니다.
 7. `PaymentRequestKafkaConsumer`가 이벤트를 소비해 `payment_requests`를 저장하고 `ticket_inventory.available_quantity`를 감소시킵니다.
 8. DB 커밋 후 슬롯을 반환하고 다음 대기자를 자동 진입시킵니다.
